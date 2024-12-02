@@ -1,0 +1,76 @@
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import ReactWebcam from "react-webcam";
+import { io } from "socket.io-client";
+
+const FPS = 1;
+
+const URL = "http://localhost:3000";
+
+const socket = io(URL, {
+  transports: ["websocket"],
+});
+
+const liste_emoji = {
+  happy: "😊",
+  sad: "😢",
+  angry: "😠",
+  surprised: "😲",
+  neutral: "😐",
+  fear: "😨",
+};
+
+export function Webcam() {
+  const webcamRef = useRef();
+  const [result, setResult] = useState({});
+  const [emotion, setEmotion] = useState("");
+
+  useLayoutEffect(() => {
+    const snap = () => {
+      const imgSrc = webcamRef?.current?.getScreenshot();
+      return imgSrc;
+    };
+
+    socket.on("connect", () => {
+      console.log("connected", socket.id);
+    });
+
+    socket.on("data", (data) => {
+      setResult(data);
+
+      const emo = data?.face?.[0]?.emotion?.[0]?.emotion;
+      setEmotion(emo);
+    });
+
+    setInterval(async () => {
+      const img = snap();
+      if (!img) return;
+
+      const data = await fetch(img);
+      const blob = await data.blob();
+      const arraybuffer = await blob.arrayBuffer();
+
+      console.log(result["face"][0]["box"]);
+
+      socket.emit("image1", arraybuffer);
+    }, 1000 / FPS);
+  }, []);
+
+  return (
+    <div style={{ position: "relative", display: "inline-block" }}>
+      <ReactWebcam ref={webcamRef} screenshotFormat="image/jpeg" />
+      <div
+        style={{
+          position: "absolute",
+          top: "50%",
+          left: "50%",
+          transform: "translate(-50%, -50%)",
+          color: "white",
+          fontSize: "16rem", // Increased the font size
+        }}
+      >
+        {liste_emoji[emotion]}
+      </div>
+      {/* {JSON.stringify(result?.face?.[0]?.emotion)} */}
+    </div>
+  );
+}
